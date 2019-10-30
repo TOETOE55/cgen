@@ -5,13 +5,11 @@ a lightweight generator implemented by ucontext.h
 
 ```c
 // create a generator
-gen_t generator(void f(gen_t*));
-// drop a generator
-void drop_gen(gen_t* gen);
+gen_t generator(void f(gen_t));
 // yield the current sub-routine
-value yield(gen_t* gen, value v);
+value yield(gen_t gen, value v);
 // continue a generator
-int resume(gen_t* gen, value* out, value in);
+int resume(gen_t gen, value* out, value in);
 ```
 
 
@@ -21,13 +19,14 @@ int resume(gen_t* gen, value* out, value in);
 create and drop a generator:
 
 ```c
-void foo(gen_t* gen) {
+void foo(gen_t gen) {
     printf("foo start\n");
 }
 
 int main() {
     gen_t foo_gen = generator(foo);
-    drop_gen(&foo_gen);
+    free(foo);
+    return 0;
 }
 ```
 
@@ -36,7 +35,7 @@ int main() {
 yield and resume a generator:
 
 ```c
-void foo(gen_t* gen) {
+void foo(gen_t gen) {
     value v = 0;
     printf("foo start\n");
     v = yield(gen, 100);
@@ -51,10 +50,10 @@ void foo(gen_t* gen) {
 int main() {
     gen_t foo_gen = generator(foo);
     value v;
-    for (int i = 0; resume(&foo_gen, &v, i); ++i) {
+    for (int i = 0; resume(foo_gen, &v, i); ++i) {
         printf("yield %lld from foo\n", v);
     }
-    drop_gen(&foo_gen);
+    free(foo_gen);
     return 0;
 }
 
@@ -75,7 +74,7 @@ foo end
 you can create many generators:
 
 ```C
-void fib(gen_t* gen) {
+void fib(gen_t gen) {
     value an_1 = 1, an_2 = 0;
     while (an_2 >= 0) {
         yield(gen, an_2);
@@ -85,7 +84,7 @@ void fib(gen_t* gen) {
     }
 }
 
-void fact(gen_t* gen) {
+void fact(gen_t gen) {
     value an = 1;
     for (int i = 1; an >= 0; ++i) {
         yield(gen, an);
@@ -98,13 +97,13 @@ int main() {
     gen_t fact_gen = generator(fact);
     
     value an, bn;
-    for (int i = 0; resume(&fib_gen, &an, i) && resume(&fact_gen, &bn, i); ++i) {
+    for (int i = 0; resume(fib_gen, &an, i) && resume(fact_gen, &bn, i); ++i) {
         printf("fib(%d) %lld\n", i, an);
         printf("fact(%d) %lld\n", i, bn);
     }
 
-    drop_gen(&fib_gen);
-    drop_gen(&fact_gen);
+    free(fib_gen);
+    free(fact_gen);
     
     return 0;
 }
