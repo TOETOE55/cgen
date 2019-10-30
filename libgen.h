@@ -7,23 +7,16 @@
 
 #include <ucontext.h>
 
-#define DEFAULT_STACK_SIZE (1024*128)
+#define DEFAULT_STACK_SIZE (1024*1024*2)
 
 typedef long long value;
-typedef struct {
-    int         tag;        // done or not
-    ucontext_t  in_ctx;     // parent ctx
-    ucontext_t  out_ctx;    // sub-routine ctx
-    value       out;
-    value       in;
-} gen_t;
+struct _gen_t;
+typedef struct _gen_t * gen_t;
 
-value yield(gen_t* gen, value v);
+value yield(gen_t gen, value v);
 
-int resume(gen_t* gen, value* out, value in);
+int resume(gen_t gen, value* out, value in);
 
-gen_t generator(void f(gen_t*));
-
-void drop_gen(gen_t* gen);
+gen_t generator(void f(gen_t));
 
 #endif //GENERATOR_LIBGEN_H
