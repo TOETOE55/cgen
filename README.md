@@ -4,12 +4,19 @@ a lightweight generator implemented by ucontext.h
 ## API
 
 ```c
-// create a generator
+// create the generator
 gen_t generator(void f(gen_t));
-// yield the current sub-routine
-value yield(gen_t gen, value v);
-// continue a generator
-int resume(gen_t gen, value* out, value in);
+// delete the generator, 
+// you can drop the parent generator 
+// but the the program will exit 
+// when the generator return
+void drop_gen(gen_t gen);
+
+// resume the generator, with the input or the output paramenter
+int resume(gen_t gen, value in, value* out);
+int resume_by(gen_t gen, value in);
+int resume_on(gen_t gen, value* out);
+int resume_(gen_t gen);
 ```
 
 
@@ -25,7 +32,7 @@ void foo(gen_t gen) {
 
 int main() {
     gen_t foo_gen = generator(foo);
-    free(foo);
+    drop_gen(foo);
     return 0;
 }
 ```
@@ -35,49 +42,46 @@ int main() {
 yield and resume a generator:
 
 ```c
-void foo(gen_t gen) {
-    value v = 0;
-    printf("foo start\n");
-    v = yield(gen, 100);
-    printf("foo is resumed by %lld\n", v);
-    v = yield(gen, 99);
-    printf("foo is resumed by %lld\n", v);
-    v = yield(gen, 98);
-    printf("foo is resumed by %lld\n", v);
-    printf("foo end\n");
+void foo(gen_t parent_gen) {
+    value x;
+    resume(parent_gen, 99, &x);
+    printf("resume from main and get %lld\n", x);
+    resume(parent_gen, 98, &x);
+    printf("resume from main and get %lld\n", x);
+    resume(parent_gen, 97, &x);
+    printf("resume from main and get %lld\n", x);
 }
 
+
 int main() {
+    value x = 100;
     gen_t foo_gen = generator(foo);
-    value v;
-    for (int i = 0; resume(foo_gen, &v, i); ++i) {
-        printf("yield %lld from foo\n", v);
+    for (int i = 0; resume(foo_gen, i, &x); ++i) {
+        printf("resume from foo and get %lld\n", x);
     }
-    free(foo_gen);
+    drop_gen(foo_gen);
     return 0;
 }
 
 /* output
-foo start
-yield 100 from foo
-foo is resumed by 1
-yield 99 from foo
-foo is resumed by 2
-yield 98 from foo
-foo is resumed by 3
-foo end
+resume from foo and get 99
+resume from main and get 1
+resume from foo and get 98
+resume from main and get 2
+resume from foo and get 97
+resume from main and get 3
 */
 ```
 
 
 
-you can create many generators:
+you can create multiple generators:
 
 ```C
 void fib(gen_t gen) {
     value an_1 = 1, an_2 = 0;
     while (an_2 >= 0) {
-        yield(gen, an_2);
+        resume_by(gen, an_2);
         value tmp = an_1;
         an_1 = an_1 + an_2;
         an_2 = tmp;
@@ -86,8 +90,8 @@ void fib(gen_t gen) {
 
 void fact(gen_t gen) {
     value an = 1;
-    for (int i = 1; an >= 0; ++i) {
-        yield(gen, an);
+    for (int i = 1; an > 0; ++i) {
+        resume_by(gen, an);
         an *= i;
     }
 }
@@ -95,16 +99,16 @@ void fact(gen_t gen) {
 int main() {
     gen_t fib_gen = generator(fib);
     gen_t fact_gen = generator(fact);
-    
     value an, bn;
-    for (int i = 0; resume(fib_gen, &an, i) && resume(fact_gen, &bn, i); ++i) {
+    for (int i = 0;
+        resume_on(fib_gen, &an) &&
+        resume_on(fact_gen, &bn); ++i) {
         printf("fib(%d) %lld\n", i, an);
         printf("fact(%d) %lld\n", i, bn);
     }
 
-    free(fib_gen);
-    free(fact_gen);
-    
+    drop_gen(fact_gen);
+    drop_gen(fib_gen);
     return 0;
 }
 
