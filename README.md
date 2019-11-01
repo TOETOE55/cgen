@@ -13,8 +13,8 @@ gen_t generator(void f(gen_t));
 void drop_gen(gen_t gen);
 
 // resume the generator, with the input or the output paramenter
-int resume(gen_t gen, value in, value* out);
-int resume_by(gen_t gen, value in);
+int resume(gen_t gen, value send, value* out);
+int resume_by(gen_t gen, value send);
 int resume_on(gen_t gen, value* out);
 int resume_(gen_t gen);
 ```

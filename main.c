@@ -32,6 +32,7 @@ void foo(gen_t parent_gen) {
 
 
 int main() {
+
     gen_t fib_gen = generator(fib);
     gen_t fact_gen = generator(fact);
     value an, bn;
@@ -44,7 +45,6 @@ int main() {
 
     drop_gen(fact_gen);
     drop_gen(fib_gen);
-
 
     value x = 100;
     gen_t foo_gen = generator(foo);
