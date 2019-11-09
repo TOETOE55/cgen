@@ -20,16 +20,16 @@ void fact(gen_t gen, value start) {
 }
 
 
-void foo(gen_t parent_gen, value start) {
+void foo(gen_t gen, value start) {
     printf("start with %lld\n", start);
     value x;
-    resume(parent_gen, 99, &x);
+    resume(gen, 99, &x);
     printf("resume from main and get %lld\n", x);
-    resume(parent_gen, 98, &x);
+    resume(gen, 98, &x);
     printf("resume from main and get %lld\n", x);
-    resume(parent_gen, 97, &x);
+    resume(gen, 97, &x);
     printf("resume from main and get %lld\n", x);
-    drop_gen(parent_gen);
+    drop_gen(gen);
 }
 
 
