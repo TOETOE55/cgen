@@ -7,94 +7,89 @@
 #include "libgen.h"
 
 struct _gen_t {
-    int          tag;
-    ucontext_t*  ctx;
+    int          state;
     void*        stack;
     value        send;
-    gen_t        co;
+    gen_t        dual;
+    ucontext_t   ctx;
 };
 
-gen_t generator(void f(gen_t)) {
-    void launch(gen_t, void (gen_t));
-    ucontext_t*  ctx = malloc(sizeof(ucontext_t));
-    ucontext_t*  co_ctx = malloc(sizeof(ucontext_t));
+gen_t generator(void f(gen_t, value)) {
+    void bootstrap(gen_t, void (gen_t, value));
     void* stack = malloc(DEFAULT_STACK_SIZE);
 
     gen_t gen = malloc(sizeof(struct _gen_t));
-    gen_t co_gen = malloc(sizeof(struct _gen_t));
-    gen->tag = 1;
-    gen->ctx = ctx;
-    gen->stack = NULL;
-    gen->co = co_gen;
+    gen_t dual_gen = malloc(sizeof(struct _gen_t));
 
-    co_gen->tag = 1;
-    co_gen->ctx = co_ctx;
-    co_gen->stack = stack;
-    co_gen->co = gen;
+    gen->state = 1;
+    gen->stack = stack;
+    gen->dual = dual_gen;
 
-    getcontext(co_ctx);
-    co_ctx->uc_stack.ss_sp = stack;
-    co_ctx->uc_stack.ss_size = DEFAULT_STACK_SIZE;
-    co_ctx->uc_stack.ss_flags = 0;
-    co_ctx->uc_link = ctx;
-    ctx->uc_link = NULL;
-    makecontext(co_ctx, (void (*)(void)) launch, 2, gen, f);
-    return co_gen;
+    dual_gen->state = 1;
+    dual_gen->stack = NULL;
+    dual_gen->dual = gen;
+
+    getcontext(&gen->ctx);
+    gen->ctx.uc_stack.ss_sp = stack;
+    gen->ctx.uc_stack.ss_size = DEFAULT_STACK_SIZE;
+    gen->ctx.uc_stack.ss_flags = 0;
+    gen->ctx.uc_link = &dual_gen->ctx;
+    dual_gen->ctx.uc_link = NULL;
+    makecontext(&gen->ctx, (void (*)(void)) bootstrap, 2, dual_gen, f);
+
+    return gen;
 }
 
-int resume(gen_t gen, value in, value* out) {
-    if (!gen->tag) { return 0; }
-    gen->send = in;
-    swapcontext(gen->co->ctx, gen->ctx);
-    *out = gen->co->send;
-    return gen->tag;
+int resume(gen_t gen, value send, value* recv) {
+    if (!gen->state) { return 0; }
+    gen->send = send;
+    swapcontext(&gen->dual->ctx, &gen->ctx);
+    *recv = gen->dual->send;
+    return gen->state;
 }
 
-int resume_by(gen_t gen, value in) {
-    if (!gen->tag) { return 0; }
-    gen->send = in;
-    swapcontext(gen->co->ctx, gen->ctx);
-    return gen->tag;
+int resume_by(gen_t gen, value send) {
+    if (!gen->state) { return 0; }
+    gen->send = send;
+    swapcontext(&gen->dual->ctx, &gen->ctx);
+    return gen->state;
 }
 
-int resume_on(gen_t gen, value* out) {
-    if (!gen->tag) { return 0; }
-    swapcontext(gen->co->ctx, gen->ctx);
-    *out = gen->co->send;
-    return gen->tag;
+int resume_on(gen_t gen, value* recv) {
+    if (!gen->state) { return 0; }
+    swapcontext(&gen->dual->ctx, &gen->ctx);
+    *recv = gen->dual->send;
+    return gen->state;
 }
 
 int resume_(gen_t gen) {
-    if (!gen->tag) { return 0; }
-    swapcontext(gen->co->ctx, gen->ctx);
-    return gen->tag;
+    if (!gen->state) { return 0; }
+    swapcontext(&gen->dual->ctx, &gen->ctx);
+    return gen->state;
 }
 
 void drop_gen(gen_t gen) {
-    free(gen->ctx);
-    free(gen->stack);
-    gen->ctx = NULL;
-    gen->stack = NULL;
-
-    if (gen->co->ctx->uc_link) {
-        gen->co->ctx->uc_link = NULL;
+    if (gen->dual->ctx.uc_link) {
+        gen->dual->ctx.uc_link = NULL;
         return;
     }
-    free(gen->co->ctx);
-    free(gen->co);
-    gen->co = NULL;
+
+    free(gen->dual);
+    gen->dual = NULL;
+
+    free(gen->stack);
+    gen->stack = NULL;
 
     free(gen);
 }
 
 
 
-void launch(gen_t gen, void f(gen_t)) {
-    f(gen);
-    // TODO any other error handler
+void launch(gen_t gen, void f(gen_t, value)) {
+    f(gen, gen->dual->send);
 
-    if (!gen->co->ctx->uc_link) {
+    if (!gen->dual->ctx.uc_link) {
         exit(0);
     }
-    gen->co->tag = 0;
+    gen->dual->state = 0;
 }

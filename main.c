@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "libgen.h"
 
-void fib(gen_t gen) {
+void fib(gen_t gen, value start) {
     value an_1 = 1, an_2 = 0;
     while (an_2 >= 0) {
         resume_by(gen, an_2);
@@ -11,7 +11,7 @@ void fib(gen_t gen) {
     }
 }
 
-void fact(gen_t gen) {
+void fact(gen_t gen, value start) {
     value an = 1;
     for (int i = 1; an > 0; ++i) {
         resume_by(gen, an);
@@ -19,7 +19,9 @@ void fact(gen_t gen) {
     }
 }
 
-void foo(gen_t parent_gen) {
+
+void foo(gen_t parent_gen, value start) {
+    printf("start with %lld\n", start);
     value x;
     resume(parent_gen, 99, &x);
     printf("resume from main and get %lld\n", x);
